@@ -40,30 +40,44 @@ class bxon_context(object):
         self.file.close()
 
     def lengthForNative(self,t):
-        if(t == BXON_BOOLEAN):
-            return 1
+        if(t == BXON_FLOAT):
+            return 4
         elif(t == BXON_INT):
-            return 4 
-        elif(t == BXON_LONG):
-            return 8
-        elif(t == BXON_FLOAT):
             return 4
         elif(t == BXON_DOUBLE):
             return 8
+        elif(t == BXON_LONG):
+            return 8
         elif(t == BXON_BYTE):
             return 1
+        elif(t == BXON_BOOLEAN):
+            return 1
             
-    def writeNative(self,t,val):
-        if(t == BXON_BOOLEAN):
-            self.write("<B",val) 
-        elif(t == BXON_INT):
-            self.write("<i",val) 
+    def writeNative(self,t,s,val):
+        if t == BXON_FLOAT:
+            if s == 1:
+                self.file.write(struct.pack("<f",val))
+            elif s == 2:
+                self.file.write(struct.pack("<2f",val[0],val[1]))
+            elif s == 3:
+                self.file.write(struct.pack("<3f",val[0],val[1],val[2]))
+            elif s == 4:
+                self.file.write(struct.pack("<4f",val[0],val[1],val[2],val[3]))
+        elif t == BXON_INT:
+            if s == 1:
+                self.file.write(struct.pack("<i",val))
+            elif s == 2:
+                self.file.write(struct.pack("<2i",val[0],val[1]))
+            elif s == 3:
+                self.file.write(struct.pack("<3i",val[0],val[1],val[2]))
+            elif s == 4:
+                self.file.write(struct.pack("<4i",val[0],val[1],val[2],val[3]))
         elif(t == BXON_LONG):
-            self.write("<q",val) 
-        elif(t == BXON_FLOAT):
-            self.write("<f",val)
+            self.write("<q",val)
         elif(t == BXON_DOUBLE):
             self.write("<d",val) 
+        elif(t == BXON_BOOLEAN):
+            self.write("<B",val) 
         elif(t == BXON_BYTE):
             self.write("<B",val) 
             
@@ -73,7 +87,13 @@ class bxon_native(object):
         self.value = v
 
     def write(self,ctx):
-        if self.type == BXON_NIL: 
+        if self.type == BXON_FLOAT:
+            ctx.write("<B",BXON_FLOAT)
+            ctx.write("<f",self.value)  
+        elif self.type == BXON_INT:
+            ctx.write("<B",BXON_INT)
+            ctx.write("<i",self.value)   
+        elif self.type == BXON_NIL: 
             ctx.write("<B",BXON_NIL)
         elif self.type == BXON_STRING:
             ctx.write("<B",BXON_STRING | BXON_LENGTH_32)
@@ -83,16 +103,10 @@ class bxon_native(object):
                 ctx.file.write(struct.pack("<B",c))
         elif self.type == BXON_BOOLEAN: 
             ctx.write("<B",BXON_BOOLEAN) 
-            ctx.write("<B",self.value) 
-        elif self.type == BXON_INT:
-            ctx.write("<B",BXON_INT)
-            ctx.write("<i",self.value)      
+            ctx.write("<B",self.value)    
         elif self.type == BXON_LONG:
             ctx.write("<B",BXON_LONG)
             ctx.write("<q",self.value)
-        elif self.type == BXON_FLOAT:
-            ctx.write("<B",BXON_FLOAT)
-            ctx.write("<f",self.value)  
         elif self.type == BXON_DOUBLE:
             ctx.write("<B",BXON_DOUBLE)
             ctx.write("<d",self.value)  
@@ -149,13 +163,14 @@ class bxon_map(object):
         self.context.seek(self.endPos);
 
 class bxon_array(object):
-    def __init__(self,ctx=None,nType=BXON_NIL,nCount=0):
+    def __init__(self,ctx=None,nType=BXON_NIL,nCount=0,nStride=1):
         self.parent = None
         self.context = ctx
         self.startPos = None
         self.endPos = None
         self.nativeType = BXON_NIL;
         self.array = []
+        self.stride = nStride
         
         if nType != BXON_NIL and nType != BXON_STRING:
             self.nativeType = nType
@@ -171,7 +186,7 @@ class bxon_array(object):
             self.context.write("<q",0)
             self.startPos = self.context.tell()
             if self.nativeType != BXON_NIL:
-                ePos = self.startPos + self.nativeCount * self.context.lengthForNative(self.nativeType)
+                ePos = self.startPos + self.nativeCount * self.stride * self.context.lengthForNative(self.nativeType)
                 self.context.seek(ePos)
                 
     def _update(self, pos = None):
@@ -184,14 +199,17 @@ class bxon_array(object):
     def push(self, obj):
         self.write()
         if self.nativeType != BXON_NIL:    
-            pos = self.startPos + self.nativeIndex * self.context.lengthForNative(self.nativeType)
+            pos = self.startPos + self.nativeIndex * self.stride * self.context.lengthForNative(self.nativeType)
+            
             if pos!=self.context.tell():
                 self.context.seek(pos)
             if type(obj) == bxon_native:
-                self.context.writeNative(self.nativeType,obj.value)
+                self.context.writeNative(self.nativeType,self.stride,obj.value)
             else:
-                self.context.writeNative(self.nativeType,obj)
+                self.context.writeNative(self.nativeType,self.stride,obj)
+            
             self.nativeIndex+=1
+            
             if(self.nativeIndex >= self.nativeCount):
                 self._update()
         else:
