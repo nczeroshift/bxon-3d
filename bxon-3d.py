@@ -6,19 +6,20 @@ print("BXON Start")
 
 start_time = time.time()
 
-f = open("test.bxon","wb")
+f = open("/Users/zeroshift/Workspace/git/bxon/test.bxon","wb")
 ctx = bxon_context(f)
 
 root = bxon_map(ctx)
 
 meshMap = root.put("mesh",bxon_map())
 
-obj = bpy.context.selected_objects[0]
-mesh = obj.data
+objRef = bpy.context.selected_objects[0]
+mesh = objRef.data
 
 
-def writeMesh(pNode,mesh):
-    node = pNode.put(mesh.name,bxon_map())
+def writeMesh(parent,obj):
+    mesh = obj.data
+    node = parent.put(mesh.name,bxon_map())
     
     vCount = len(mesh.vertices)
     mPositions = node.put("positions",bxon_array(nType=BXON_FLOAT, nCount = vCount, nStride = 3))
@@ -35,6 +36,7 @@ def writeMesh(pNode,mesh):
     matCount = len(mesh.materials)
     uvCount = len(mesh.uv_textures)
     colorCount = len(mesh.vertex_colors)
+    groupsCount = len(obj.vertex_groups)
     
     for i,fc in enumerate(mesh.polygons):
         vLen = len(fc.vertices)
@@ -42,10 +44,24 @@ def writeMesh(pNode,mesh):
             f3Count += 1
         elif vLen == 4:
             f4Count += 1
-
-    #for i,fc in enumerate(mesh.polygons):
-    #    print(fc)
-
+            
+    if matCount > 0:
+        mMaterials = node.put("materials",bxon_array())   
+        for m in mesh.materials:
+            mMaterials.push(bxon_native(BXON_STRING,m.name))
+            
+    if groupsCount > 0:
+        mGroups = node.put("vertex_groups",bxon_array())   
+        for g in obj.vertex_groups:
+            mGroups.push(bxon_native(BXON_STRING,g.name))
+            print(g.name)
+            
+        mWeights = node.put("vertex_weights",bxon_array())       
+        for i,v in enumerate(mesh.vertices):
+            mVW = mWeights.push(bxon_array())
+            for group in v.groups:
+                mVW.push(bxon_native(BXON_INT,group.group))
+                mVW.push(bxon_native(BXON_FLOAT,group.weight))  
        
     if f3Count > 0:
         mF3 = node.put("faces3",bxon_array(nType=BXON_INT,nCount = f3Count, nStride = 3))
@@ -90,7 +106,7 @@ def writeMesh(pNode,mesh):
                             mF4uv.push(mesh.uv_layers[j].data[fc.loop_indices[k]].uv)
                  
              
-writeMesh(meshMap,mesh)
+writeMesh(meshMap,objRef)
 
 
 elapsed_time = time.time() - start_time
