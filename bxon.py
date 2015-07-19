@@ -143,8 +143,17 @@ class bxon_map(object):
         self.write()
         kObj = bxon_native(BXON_STRING,key);
         kObj.write(self.context)
-        if type(vObj) is bxon_native:
+        t = type(vObj)
+        if t is bxon_native:
             vObj.write(self.context)
+        elif t is str:
+            bxon_native(BXON_STRING,vObj).write(self.context)
+        elif t is float:
+            bxon_native(BXON_FLOAT,vObj).write(self.context)
+        elif t is int:
+            bxon_native(BXON_INT,vObj).write(self.context)
+        elif t is bool:
+            bxon_native(BXON_BOOLEAN,vObj).write(self.context)
         else:
             self.map[key] = vObj;
             vObj.write(self)
@@ -233,7 +242,7 @@ class bxon_array(object):
 def test():
     print("BXON Python Writer Test")
     
-    f = open("../test.bxon","wb")
+    f = open("test.bxon","wb")
     ctx = bxon_context(f)
     
     start_time = time.time()
