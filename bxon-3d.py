@@ -374,9 +374,10 @@ class bXExporter:
         node.put("specular_intensity",mat.specular_intensity)
         
         node.put("ambient",mat.ambient)
-
-        if(mat.transparency_method == "Z_TRANSPARENCY"):
-            node.put("transparency_method","alpha_blend")
+        
+        if(mat.use_transparency):
+            if(mat.transparency_method == "Z_TRANSPARENCY"):
+                node.put("transparency_method","alpha_blend")
     
         for tname in mat.texture_slots.keys():
             t = mat.texture_slots[tname]
