@@ -238,7 +238,7 @@ class bxon_array(object):
         if self.startPos == None:
             self.context.write("<B",BXON_ARRAY|BXON_LENGTH_64|self.nativeType)
             self.context.write("<q",0)
-            self.startPos = self.context.tell()
+            self.endPos = self.startPos = self.context.tell()
             if self.nativeType != BXON_NIL:
                 ePos = self.startPos + self.nativeCount * self.stride * self.context.lengthForNative(self.nativeType)
                 self.context.seek(ePos)
@@ -528,17 +528,19 @@ class bxExporter:
         print ("  Curves : " + str(self.curveMap.size()))
     
     ## Write texture data.
-    def exportTexture(self, map, entry):
+    def exportTexture(self, array, entry):
         tex = entry.data
         print("  Texture : \"" + tex.name + "\"")
-        node = map.put(tex.name,bxon_map())
+        node = array.push(bxon_map())#map.put(tex.name,bxon_map())
+        node.put("name", tex.name)
         node.put("type", "image")
         node.put("filename", os.path.basename(tex.image.filepath))
         return True
 
     ## Export texture mapping mode.
-    def exportTextureMapping(self, map, slot):
-        node = map.put(slot.name,bxon_map())
+    def exportTextureMapping(self, array, slot):
+        node = array.push(bxon_map())
+        node.put("name",slot.name)
         
         mapping = "uv"
         if(slot.texture_coords == "GLOBAL"):
@@ -604,16 +606,20 @@ class bxExporter:
                 print ("   Error : Texture was not found.")
                 return False
             node.put("texture", slot.texture.name)
+            node.put("id", nd.id)
         else:
             print("   Error : Texture type isn't supported.")
             return False
         return True
         
     ## Write material data.
-    def exportMaterial(self, map, entry):
+    def exportMaterial(self, array, entry):
         mat = entry.data
         print("  Material : \"" + mat.name + "\"")
-        node = map.put(mat.name,bxon_map())
+        #node = map.put(mat.name,bxon_map())
+        
+        node = array.push(bxon_map())
+        node.put("name",mat.name)
         
         diffuse = node.put("diffuse", bxon_array(nType=BXON_FLOAT, nCount = 1, nStride = 3))
         diffuse.push(mat.diffuse_color)
@@ -631,28 +637,34 @@ class bxExporter:
         if(mat.use_transparency):
             if(mat.transparency_method == "Z_TRANSPARENCY"):
                 node.put("transparency_method","alpha_blend")
-    
+        
+        tex = node.put("textures",bxon_array())
+        
         for tname in mat.texture_slots.keys():
             t = mat.texture_slots[tname]
             if(t.texture.type=="IMAGE"):
-                 self.exportTextureMapping(node,t)   
+                 self.exportTextureMapping(tex,t)   
         return True
 
     ## Write camera data.    
-    def exportCamera(self, map, entry):
+    def exportCamera(self, array, entry):
         cam = entry.data
         print("  Camera : \"" + cam.name + "\"")
-        node = map.put(cam.name, bxon_map())
+        #node = map.put(cam.name, bxon_map())
+        node = array.push(bxon_map())
+        node.put("name",cam.name)
         node.put("fov",(180/math.pi)*2*math.atan(16/(cam.lens* 1.3254834)))
         node.put("start", cam.clip_start)
         node.put("end", cam.clip_end)
         return True
         
     ## Write lamp data.
-    def exportLamp(self, map, entry):
+    def exportLamp(self, array, entry):
         lamp = entry.data
         print("  Lamp : \"" + lamp.name + "\"")
-        node = map.put(lamp.name, bxon_map())
+        #node = map.put(lamp.name, bxon_map())
+        node = array.push(bxon_map())
+        node.put("name",lamp.name)
         diffuse = node.put("color", bxon_array(nType=BXON_FLOAT, nCount = 1, nStride = 3))
         diffuse.push(lamp.color)
         node.put("energy", lamp.energy)
@@ -660,10 +672,12 @@ class bxExporter:
         return True
         
     ## Write curve data.
-    def exportCurve(self, pNode, entry):
+    def exportCurve(self, array, entry):
         curve = entry.data
         print("  Curve : \"" + curve.name + "\"")
-        node = pNode.put(curve.name, bxon_map())
+        #node = pNode.put(curve.name, bxon_map())
+        node = array.push(bxon_map())
+        node.put("name",curve.name)
         node.put("resolution", curve.resolution_u)
         splines = node.put("splines", bxon_array())
         for sp in curve.splines:
@@ -679,17 +693,19 @@ class bxExporter:
         return True
     
     ## Write armature data.
-    def exportArmature(self, map, entry):
+    def exportArmature(self, array, entry):
         arm = entry.data
         print("  Armature : \"" + arm.name + "\"")
-        node = map.put(arm.name, bxon_map())
+        #node = map.put(arm.name, bxon_map())
+        node = array.push(bxon_map())
+        node.put("name", arm.name)
         
         bonesMap = bxMap()
             
         for b_k in arm.bones.keys():
-            bonesMap.add(None,arm.bones[b_k])
+            bonesMap.add(arm.bones[b_k])
         
-        bones = node.put("bones", bxon_map())
+        bones = node.put("bones", bxon_array())
         
         for b_k in arm.bones.keys():
             b = arm.bones[b_k]
@@ -697,7 +713,9 @@ class bxExporter:
             bp_head = Vector()
             bp_tail = Vector()
             
-            bNode = bones.put(b.name,bxon_map())
+            bNode = bones.push(bxon_map())
+            
+            bNode.put("name",b.name)
             
             bp_node = None    
             if(b.parent):
@@ -706,7 +724,9 @@ class bxExporter:
             if(bp_node):
                 bp_head = bp_node.data.head_local
                 bp_tail = bp_node.data.tail_local
-                bNode.put("parent", b.parent.name)
+                pMap = bNode.put("parent", bxon_map())
+                pMap.put("name",b.parent.name)
+                pMap.put("id",bp_node.id)
                           
             head = b.head_local-bp_tail
             tail = b.tail_local-bp_tail
@@ -720,43 +740,54 @@ class bxExporter:
         return True
         
     # Write object data.    
-    def exportObject(self, map, entry):
+    def exportObject(self, array, entry):
         obj = entry.data
         print("  Object : \"" + obj.name + "\"")
-        node = map.put(obj.name, bxon_map())
-      
+        #node = map.put(obj.name, bxon_map())
+        node = array.push(bxon_map())
+        node.put("name", obj.name)
+        
         datablock_type = None
         datablock_id = None
+        datablock_name = None
         
         if (obj.type == "MESH"):
             datablock_type = "mesh"
-            datablock_id = obj.data.name
-            
+            datablock_name = obj.data.name
+            datablock_id = self.meshMap.find(obj.data.name).id      
+                
         elif (obj.type == "EMPTY"):
             datablock_type = "empty"
+            
         elif (obj.type == "LAMP"):
             datablock_type = "lamp"
-            datablock_id = obj.data.name
+            datablock_name = obj.data.name
+            datablock_id = self.lampMap.find(obj.data.name).id
             
         elif (obj.type == "CAMERA"):
             datablock_type = "camera"
-            datablock_id = obj.data.name
+            datablock_name = obj.data.name
+            datablock_id = self.cameraMap.find(obj.data.name).id
             
         elif (obj.type == "CURVE"):
             datablock_type = "curve"
-            datablock_id = obj.data.name
+            datablock_name = obj.data.name
+            datablock_id = self.curveMap.find(obj.data.name).id
                      
         elif (obj.type == "ARMATURE"):
             datablock_type = "armature"
-            datablock_id = obj.data.name
-                  
+            datablock_name = obj.data.name
+            datablock_id = self.armatureMap.find(obj.data.name).id
 
         datablock = node.put("datablock", bxon_map())
         datablock.put("type", datablock_type)
         
-        if(datablock_id):
+        if(datablock_id != None):
             datablock.put("id", datablock_id)
         
+        if(datablock_name != None):
+            datablock.put("name", datablock_name)
+            
         if(obj.parent != None):
             no = self.objectMap.find(obj.parent.name)
             if(no):
@@ -774,22 +805,24 @@ class bxExporter:
         position.push(obj_mat.to_translation())
             
         rotation = node.put("quaternion", bxon_array(nType=BXON_FLOAT, nCount = 1, nStride = 4))
-        rotation.push(obj_mat.to_quaternion())
+        rotation.push([obj_mat.to_quaternion().x,obj_mat.to_quaternion().y,obj_mat.to_quaternion().z,obj_mat.to_quaternion().w])
         
         scale = node.put("scale", bxon_array(nType=BXON_FLOAT, nCount = 1, nStride = 3))
         scale.push(obj_mat.to_scale())
         
         return True
             
-    def exportMesh(self, map, entry):
+    def exportMesh(self, array, entry):
         obj = entry.users[0]
         mesh = entry.data;
         
         print("  Mesh : \"" + obj.name + "\"")
         mesh = obj.data
         
-        node = map.put(mesh.name,bxon_map())
-
+        #node = map.put(mesh.name,bxon_map())
+        node = array.push(bxon_map())
+        node.put("name", mesh.name)
+        
         vCount = len(mesh.vertices)
         mPositions = node.put("positions", bxon_array(nType=BXON_FLOAT, nCount = vCount, nStride = 3))
         mNormals = node.put("normals", bxon_array(nType=BXON_FLOAT, nCount = vCount, nStride = 3))
@@ -846,6 +879,10 @@ class bxExporter:
                     mFm.push(fc.material_index)
 
         if uvCount > 0:
+                mUVLayers = node.put("uv_layers",bxon_array())
+                for lName in mesh.uv_textures:
+                    mUVLayers.push(bxon_native(BXON_STRING,lName.name))
+                    
                 mFuv = node.put("faces_uv",bxon_array(nType=BXON_FLOAT, nCount = uvCount * (f3Count * 3 + f4Count * 4), nStride = 2))
                 for i,fc in enumerate(mesh.polygons):
                     if len(fc.vertices) == 3 or len(fc.vertices) == 4: 
@@ -866,58 +903,58 @@ class bxExporter:
         curve_vector = self.curveMap.getNonSortedVector()    
         
         if(texture_vector != None):
-            map = pNode.put("texture", bxon_map())
+            array = pNode.put("texture", bxon_array())
             for t in texture_vector:
-                if not(self.exportTexture(map, t)):
+                if not(self.exportTexture(array, t)):
                     print("   Error")
                     return False
                 
         if(material_vector != None):
-            map = pNode.put("material", bxon_map())
+            array = pNode.put("material", bxon_array())
             for m in material_vector:
-                if not(self.exportMaterial(map, m)):
+                if not(self.exportMaterial(array, m)):
                     print("   Error")
                     return False
                                                     
         if(mesh_vector != None):
-            map = pNode.put("mesh", bxon_map())
+            array = pNode.put("mesh", bxon_array())
             for m in mesh_vector:
-                if not(self.exportMesh(map, m)):
+                if not(self.exportMesh(array, m)):
                     print("   Error")
                     return False
                                 
         if(camera_vector != None):
-            map = pNode.put("camera", bxon_map())
+            array = pNode.put("camera", bxon_array())
             for c in camera_vector:
-                if not(self.exportCamera(map, c)):
+                if not(self.exportCamera(array, c)):
                     print("   Error")
                     return False
                 
         if(armature_vector != None):
-            map = pNode.put("armature", bxon_map())
+            array = pNode.put("armature", bxon_array())
             for a in armature_vector:
                 #ue = []
                 #for u in a[1].users:
                 #    ue.append(self.objectMap.find(u.name))
-                if not(self.exportArmature(map,a)):
+                if not(self.exportArmature(array,a)):
                     return False                    
 
         if(curve_vector != None):
-            map = pNode.put("curve", bxon_map())
+            array = pNode.put("curve", bxon_array())
             for a in curve_vector:
-                if not(self.exportCurve(map, a)):
+                if not(self.exportCurve(array, a)):
                     return False    
                     
         if(lamp_vector != None):
-            map = pNode.put("lamp", bxon_map())
+            array = pNode.put("lamp", bxon_array())
             for a in lamp_vector:
-                if not(self.exportLamp(map, a)):
+                if not(self.exportLamp(array, a)):
                     return False    
                                           
         if(obj_vector != None):
-            map = pNode.put("object", bxon_map())
+            array = pNode.put("object", bxon_array())
             for o in obj_vector:
-                if not(self.exportObject(map,o)):
+                if not(self.exportObject(array,o)):
                     return False
 
 def runExport(filename):
@@ -987,6 +1024,5 @@ def unregister():
     bpy.types.INFO_MT_file_export.remove(menu_func)
 
 if __name__ == "__main__":
-    #runExport("test.bxon")
     register()
 
