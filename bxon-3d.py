@@ -105,6 +105,9 @@ class bxon_context(object):
                 self.file.write(struct.pack("<3f",val[0],val[1],val[2]))
             elif s == 4:
                 self.file.write(struct.pack("<4f",val[0],val[1],val[2],val[3]))
+            else:
+                for i in range(len(val)):
+                    self.file.write(struct.pack("<1f",val[i]))
         elif t == BXON_INT:
             if s == 1:
                 self.file.write(struct.pack("<i",val))
@@ -430,13 +433,18 @@ def bxListActionCurves(action):
                 if k_rot == None : k_rot = [1,1,1]
                 k_rot[idx] = kf
         elif path == "rotation_quaternion":
+            nIdx = idx;
+            if nIdx == 0:nIdx = 3;
+            elif nIdx == 1:nIdx = 0;
+            elif nIdx == 2:nIdx = 1;
+            elif nIdx == 3:nIdx = 2;
             if bone_name != None:
                 if k_bones[bone_name]["quat"] == None :
                     k_bones[bone_name]["quat"] = [1,1,1,1]
-                k_bones[bone_name]["quat"][idx] = kf
+                k_bones[bone_name]["quat"][nIdx] = kf
             else:
                 if k_quat == None : k_quat= [1,1,1,1]
-                k_quat[idx] = kf
+                k_quat[nIdx] = kf
         elif path == "scale":
             if bone_name != None:
                 if k_bones[bone_name]["scale"] == None :
@@ -452,7 +460,6 @@ def bxListActionCurves(action):
     if k_scale != None: ret["scale"] = k_scale
     if len(k_bones) > 0: ret["bones"] = k_bones
     return ret
-
 
 ## BXON exporter ##
 
@@ -692,11 +699,71 @@ class bxExporter:
                 right.push(p.handle_right)       
         return True
     
+    def exportGraphGroup(self, groups, nStrip):
+        if("euler" in groups and groups["euler"] != None):
+            points = groups["euler"]
+            nEuler = nStrip.put("euler",bxon_array())
+            self.exportGraph(points,nEuler)
+            
+        if("scale" in groups and groups["euler"] != None):
+            points = groups["scale"]
+            nScale = nStrip.put("scale",bxon_array())
+            self.exportGraph(points,nScale)
+            
+        if("quat" in groups and groups["quat"] != None):
+            points = groups["quat"]
+            nQuat = nStrip.put("quat",bxon_array())
+            self.exportGraph(points, nQuat)
+            
+        if("position" in groups and groups["position"] != None):
+            points = groups["position"]
+            nPosition = nStrip.put("position",bxon_array())
+            self.exportGraph(points, nPosition)
+                            
+                            
+    def exportGraph(self, points, array):
+        for k in range(len(points)):
+            nKeyframes = array.push(bxon_array(nType = BXON_FLOAT, nCount = 3 * len(points[k]) , nStride = 2))
+            for m in range(len(points[k])):
+                pnt = points[k][m]
+                nKeyframes.push(pnt[0])
+                nKeyframes.push(pnt[1])
+                nKeyframes.push(pnt[2])
+                                
+    def exportAnimation(self, node, tracks, armature = False):
+        nTracks = node.put("tracks", bxon_array())
+        
+        for i in range(len(tracks)):
+            track = tracks[i]
+            strips = track["strips"];
+                
+            nTrack = nTracks.push(bxon_map())
+            
+            nTrack.put("name",track["name"])              
+            nStrips = nTrack.put("strips",bxon_array())
+
+            for s in range(len(strips)):
+                strip = strips[s]
+                groups = strip["groups"]
+                
+                nStrip = nStrips.push(bxon_map())
+                
+                if armature:
+                    if "bones" in groups:
+                        bones = groups["bones"]                     
+                        for b in bones:
+                            boneGraphs = nStrip.put(b,bxon_map())
+                            bData = bones[b]
+                            boneGraphs.put("range",bxon_array(nType=BXON_FLOAT, nCount = 1, nStride = 2)).push(strip["range"])
+                            self.exportGraphGroup(bData, boneGraphs)  
+                else: 
+                    nStrip.put("range",bxon_array(nType=BXON_FLOAT, nCount = 1, nStride = 2)).push(strip["range"])
+                    self.exportGraphGroup(groups, nStrip)
+                         
     ## Write armature data.
     def exportArmature(self, array, entry):
         arm = entry.data
         print("  Armature : \"" + arm.name + "\"")
-        #node = map.put(arm.name, bxon_map())
         node = array.push(bxon_map())
         node.put("name", arm.name)
         
@@ -731,11 +798,23 @@ class bxExporter:
             head = b.head_local-bp_tail
             tail = b.tail_local-bp_tail
             
+            ml = bNode.put("bMatrix", bxon_array(nType = BXON_FLOAT, nCount = 1, nStride = 16))
+            mf = []
+            for i in range(4):
+                for j in range(4):
+                    mf.append(b.matrix_local[j][i])
+            ml.push(mf)
+            
             h = bNode.put("head", bxon_array(nType = BXON_FLOAT, nCount = 1, nStride = 3))
             h.push(head)
 
             t = bNode.put("tail", bxon_array(nType=BXON_FLOAT, nCount = 1, nStride = 3))
             t.push(tail)
+        
+        for o in entry.users:
+            oEntry = self.objectMap.find(o.name)
+            if(oEntry.tracks != None):
+                self.exportAnimation(node.put("animation",bxon_map()), oEntry.tracks, True)
             
         return True
         
@@ -810,13 +889,16 @@ class bxExporter:
         scale = node.put("scale", bxon_array(nType=BXON_FLOAT, nCount = 1, nStride = 3))
         scale.push(obj_mat.to_scale())
         
+        if entry.tracks != None:
+            self.exportAnimation(node.put("animation",bxon_map()),entry.tracks)
+            
         return True
             
     def exportMesh(self, array, entry):
         obj = entry.users[0]
         mesh = entry.data;
         
-        print("  Mesh : \"" + obj.name + "\"")
+        print("  Mesh : \"" + mesh.name + "\"")
         mesh = obj.data
         
         #node = map.put(mesh.name,bxon_map())
@@ -864,7 +946,11 @@ class bxExporter:
                 for group in v.groups:
                     mVW.push(bxon_native(BXON_INT,group.group))
                     mVW.push(bxon_native(BXON_FLOAT,group.weight))  
-        
+                    
+            if obj.parent != None and obj.parent.type == "ARMATURE":
+                pArmature = obj.parent.data
+                node.put("armature", pArmature.name)  
+                
         mFaces = node.put("faces_vertices",bxon_array(nType=BXON_INT,nCount = (f3Count + f4Count), nStride = 4))
         for i,fc in enumerate(mesh.polygons):
             if len(fc.vertices) == 3:
@@ -1024,5 +1110,6 @@ def unregister():
     bpy.types.INFO_MT_file_export.remove(menu_func)
 
 if __name__ == "__main__":
+    #runExport("file.bxon")
     register()
 
