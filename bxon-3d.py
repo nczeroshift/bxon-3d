@@ -1069,7 +1069,7 @@ def runExport(filename):
 ###### EXPORT OPERATOR #######
 class export_bxon(bpy.types.Operator, ExportHelper):
     '''Exports selected objects as bxon-3d file'''
-    bl_idname = "bxon_export"
+    bl_idname = "bxon.export"
     bl_label = "Export"
     filename_ext = ".bxon"
 
