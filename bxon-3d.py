@@ -974,7 +974,8 @@ class bxExporter:
                     if len(fc.vertices) == 3 or len(fc.vertices) == 4: 
                         for k,v in enumerate(fc.vertices):
                             for j in range(uvCount):
-                                mFuv.push(mesh.uv_layers[j].data[fc.loop_indices[k]].uv)
+                                uv = mesh.uv_layers[j].data[fc.loop_indices[k]].uv
+                                mFuv.push([uv[0],-uv[1]])
 
         return True
                      
