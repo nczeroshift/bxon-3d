@@ -638,6 +638,7 @@ class bxExporter:
 
         node.put("diffuse_intensity",mat.diffuse_intensity)
         node.put("specular_intensity",mat.specular_intensity)
+        node.put("specular_hardness",mat.specular_hardness)
         
         node.put("ambient",mat.ambient)
         
