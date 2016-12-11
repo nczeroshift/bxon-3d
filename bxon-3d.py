@@ -3,7 +3,7 @@
 
 # ##### BEGIN ZLIB LICENSE BLOCK #####
 #
-# Copyright (c) 2015 Luis F.Loureiro
+# Copyright (c) 2016 Luis F.Loureiro
 #
 # This software is provided 'as-is', without any express or implied
 # warranty. In no event will the authors be held liable for any damages
@@ -679,6 +679,18 @@ class bxExporter:
         node.put("distance", lamp.distance)                
         return True
         
+    ## Write timeline markers
+    def exportMarkers(self, node):
+        markers = bpy.context.scene.timeline_markers
+        if(len(markers) > 0):
+            array = node.put("tl_markers", bxon_array())
+            for m in markers:
+                entry = array.push(bxon_map())
+                entry.put("frame",m.frame)
+                if(m.camera != None):
+                    entry.put("camera",m.camera.name)
+        return True
+        
     ## Write curve data.
     def exportCurve(self, array, entry):
         curve = entry.data
@@ -1045,6 +1057,8 @@ class bxExporter:
                 if not(self.exportObject(array,o)):
                     return False
 
+        self.exportMarkers(pNode)
+        
 def runExport(filename):
     print("\nbxon-3d start, " + time.ctime())
     start_time = time.time()
