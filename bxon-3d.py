@@ -538,10 +538,14 @@ class bxExporter:
     def exportTexture(self, array, entry):
         tex = entry.data
         print("  Texture : \"" + tex.name + "\"")
-        node = array.push(bxon_map())#map.put(tex.name,bxon_map())
+        node = array.push(bxon_map())
         node.put("name", tex.name)
         node.put("type", "image")
-        node.put("filename", os.path.basename(tex.image.filepath))
+        path = tex.image.filepath;
+        if(path.startswith("//")):
+            path = path[2:]
+        path = path.replace("\\","/")
+        node.put("filename",path)
         return True
 
     ## Export texture mapping mode.
@@ -718,7 +722,7 @@ class bxExporter:
             nEuler = nStrip.put("euler",bxon_array())
             self.exportGraph(points,nEuler)
             
-        if("scale" in groups and groups["euler"] != None):
+        if("scale" in groups and groups["scale"] != None):
             points = groups["scale"]
             nScale = nStrip.put("scale",bxon_array())
             self.exportGraph(points,nScale)
@@ -838,6 +842,14 @@ class bxExporter:
         #node = map.put(obj.name, bxon_map())
         node = array.push(bxon_map())
         node.put("name", obj.name)
+        
+        layerId = 0
+        for i in range(20):
+            if(obj.layers[i]):
+                layerId = i;
+                break;
+        
+        node.put("layer", layerId)
         
         datablock_type = None
         datablock_id = None
