@@ -3,7 +3,7 @@
 
 # ##### BEGIN ZLIB LICENSE BLOCK #####
 #
-# Copyright (c) 2016 Luis F.Loureiro
+# Copyright (c) 2017 Luis F.Loureiro
 #
 # This software is provided 'as-is', without any express or implied
 # warranty. In no event will the authors be held liable for any damages
@@ -475,7 +475,8 @@ class bxExporter:
         self.armatureMap = bxMap()
         self.cameraMap = bxMap()
         self.curveMap = bxMap()
-    
+        self.applyModifiers = True
+        
     ## Get unique selected elements.
     def getSelected(self):                
         for o in bpy.context.selected_objects:
@@ -930,6 +931,9 @@ class bxExporter:
         node = array.push(bxon_map())
         node.put("name", mesh.name)
         
+        if(self.applyModifiers):
+            mesh = obj.to_mesh(bpy.context.scene, True, 'PREVIEW', False, False)
+           
         vCount = len(mesh.vertices)
         mPositions = node.put("positions", bxon_array(nType=BXON_FLOAT, nCount = vCount, nStride = 3))
         mNormals = node.put("normals", bxon_array(nType=BXON_FLOAT, nCount = vCount, nStride = 3))
@@ -946,7 +950,10 @@ class bxExporter:
         uvCount = len(mesh.uv_textures)
         colorCount = len(mesh.vertex_colors)
         groupsCount = len(obj.vertex_groups)
-
+        
+        if(obj.parent != None and obj.parent.type == 'ARMATURE'):
+            node.put("armature", obj.parent.data.name);
+            
         for i,fc in enumerate(mesh.polygons):
             vLen = len(fc.vertices)
             if vLen == 3:
@@ -1001,7 +1008,10 @@ class bxExporter:
                             for j in range(uvCount):
                                 uv = mesh.uv_layers[j].data[fc.loop_indices[k]].uv
                                 mFuv.push([uv[0],-uv[1]])
-
+       
+        if(self.applyModifiers):
+            bpy.data.meshes.remove(mesh)
+        
         return True
                      
     def export(self, pNode):
