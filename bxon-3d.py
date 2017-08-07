@@ -673,6 +673,10 @@ class bxExporter:
         
     ## Write lamp data.
     def exportLamp(self, array, entry):
+        LAMP_TYPE_POINT = 0
+        LAMP_TYPE_SPOT  = 1
+        LAMP_TYPE_SUN   = 2
+        LAMP_TYPE_AREA  = 3
         lamp = entry.data
         print("  Lamp : \"" + lamp.name + "\"")
         #node = map.put(lamp.name, bxon_map())
@@ -681,7 +685,20 @@ class bxExporter:
         diffuse = node.put("color", bxon_array(nType=BXON_FLOAT, nCount = 1, nStride = 3))
         diffuse.push(lamp.color)
         node.put("energy", lamp.energy)
-        node.put("distance", lamp.distance)                
+        node.put("distance", lamp.distance)
+        type = LAMP_TYPE_POINT
+        if(lamp.type == 'SPOT'):
+            type = LAMP_TYPE_SPOT
+        elif(lamp.type == 'SUN'):
+            type = LAMP_TYPE_SUN
+        elif(lamp.type == 'AREA'):
+            type = LAMP_TYPE_AREA
+        node.put("type",type)
+        node.put("clip_start",lamp.shadow_buffer_clip_start)
+        node.put("clip_end",lamp.shadow_buffer_clip_end)
+        if(lamp.type == 'SPOT'):
+            node.put("spot_blend",lamp.spot_blend)
+            node.put("spot_size",lamp.spot_size * 180 / math.pi)
         return True
         
     ## Write timeline markers
@@ -903,8 +920,8 @@ class bxExporter:
         
         obj_mat = obj.matrix_local
         
-        if(obj.parent):
-            obj_mat = Matrix(obj_mat * obj.matrix_parent_inverse)
+        #if(obj.parent):
+        #    obj_mat = Matrix(obj_mat * obj.matrix_parent_inverse)
         
         position = node.put("position", bxon_array(nType=BXON_FLOAT, nCount = 1, nStride = 3))
         position.push(obj_mat.to_translation())
