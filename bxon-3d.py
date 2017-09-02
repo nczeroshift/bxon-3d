@@ -563,6 +563,7 @@ class bxExporter:
             mapping = "refletion"     
         
         node.put("mapping", mapping)
+        node.put("blend", slot.blend_type)
         
         projection = "flat"
         if(slot.mapping == "CUBE"):
@@ -647,6 +648,10 @@ class bxExporter:
         
         node.put("ambient",mat.ambient)
         
+        node.put("use_shadows",mat.use_shadows)
+        node.put("use_shadeless",mat.use_shadeless)
+        node.put("emit",mat.emit)
+                
         if(mat.use_transparency):
             if(mat.transparency_method == "Z_TRANSPARENCY"):
                 node.put("transparency_method","alpha_blend")
@@ -949,7 +954,7 @@ class bxExporter:
         node.put("name", mesh.name)
         
         if(self.applyModifiers):
-            mesh = obj.to_mesh(bpy.context.scene, True, 'PREVIEW', False, False)
+            mesh = obj.to_mesh(bpy.context.scene, True, 'RENDER', False, False)
            
         vCount = len(mesh.vertices)
         mPositions = node.put("positions", bxon_array(nType=BXON_FLOAT, nCount = vCount, nStride = 3))
